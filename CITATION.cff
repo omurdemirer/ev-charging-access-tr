@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite the article and this archive."
+title: "ev-charging-access-tr: code and derived results on the sensitivity of measured EV charging access inequality to service speed, energy-distance and queueing definitions in Türkiye"
+type: software
+authors:
+  - family-names: "Demirer"
+    given-names: "Ömür"
+    affiliation: "Hitit University, Department of International Trade and Logistics"
+    orcid: "https://orcid.org/0000-0002-9502-9935"
+license: MIT
+doi: "10.5281/zenodo.23037338"
+version: "1.1.1"
+date-released: "2026-10-05"
+repository-code: "https://github.com/omurdemirer/ev-charging-access-tr"

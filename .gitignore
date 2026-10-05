@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+# raw inputs are downloaded, not versioned
+veri/osm/
+veri/dem/
+veri/worldpop/
+veri/epdk_aylik/
+veri/kgm/
+veri/turizm/
+veri/*.pbf
+veri/*.tif
+veri/*.pdf
+veri/*.xlsx
+veri/*.geojson
+veri/*.gpkg
+veri/epdk_ulusal_sarj_*.json
+*.part

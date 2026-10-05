@@ -1,0 +1,96 @@
+{
+  "_not": "Enerji modeli parametreleri ve kaynaklari. Degerler makaledeki Tablo A.1 ile aynidir.",
+  "arac": {
+    "m_kg": {
+      "deger": 1595,
+      "aciklama": "Nissan Leaf, surucu+ekipman dahil (JRC dogrulama seti). Kaynak ayrica 1521 taban ve 1640 (INL) veriyor.",
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "yuvarlanma": {
+      "aciklama": "Fiori'de yuvarlanma direnci HIZA BAGLIDIR: F = m g (Cr/1000)(c1*v_kmh + c2). Sabit C_rr KULLANILMIYOR.",
+      "Cr": 1.75,
+      "c1": 0.0328,
+      "c2": 4.575,
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "C_d": {
+      "deger": 0.28,
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "A_m2": {
+      "deger": 2.3316,
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "eta_driveline": {
+      "deger": 0.92,
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "eta_motor": {
+      "deger": 0.91,
+      "aciklama": "Leaf icin %85-95 araligi; ampirik hatayi en aza indiren deger",
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "eta_dt": {
+      "deger": 0.8372,
+      "aciklama": "0,92 x 0,91 (turetilmis)",
+      "kaynak": "turetilmis: Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    },
+    "eta_regen": {
+      "deger": 0.84,
+      "aciklama": "KAYNAKTA YOK — MODEL BOSLUGU. Fiori'nin eta_rb = exp(-0,0411/|a|) formulu YALNIZCA a<0 (yavaslama) icin tanimli, a>=0'da SIFIR. Sabit hizli inis bizim kararli-hal egim modelimizin cekirdegidir ama Fiori bir surus-cevrimi modeli oldugu icin bu durumu kapsamaz. 0,84 = formulun |a|=0,25 m/s2'deki degeri; toplam inis katsayisi 0,84*0,8372=0,70.",
+      "kaynak": "SECIM (gerekce yukarida) — Fiori formulunden turetilmis, dogrudan kaynakta YOK",
+      "duyarlilik": [
+        0.0,
+        0.4,
+        0.84
+      ]
+    },
+    "P_aux_kW": {
+      "deger": 0.7,
+      "aciklama": "taban yardimci yuk 700 W; klima senaryolari 0,85 (25C) / 1,2 (35C) / 2,2 (5C) kW",
+      "kaynak": "Fiori, Ahn & Rakha (2016) App.Energy 168:257-268 — kaynagin tam metninden dogrulandi"
+    }
+  },
+  "cevre": {
+    "rho_kgm3": {
+      "deger": 1.2,
+      "aciklama": "hava yogunlugu, ~20C deniz seviyesi",
+      "kaynak": "standart"
+    },
+    "g_ms2": {
+      "deger": 9.81,
+      "aciklama": "yercekimi ivmesi",
+      "kaynak": "standart"
+    }
+  },
+  "sayisal": {
+    "egim_sinir": {
+      "deger": 0.2,
+      "aciklama": "|egim| bu degerin ustundeyse DEM hatasi sayilip kirpilir (%20)",
+      "kaynak": "yontemsel karar"
+    },
+    "z_pencere_m": {
+      "deger": 150,
+      "aciklama": "yukselti duzlestirme penceresi",
+      "kaynak": "yontemsel karar"
+    }
+  },
+  "_yontem_kaynaklari": {
+    "enerji_modeli": {
+      "kunye": "Fiori, C., Ahn, K. & Rakha, H. A. (2016). Power-based electric vehicle energy consumption model: Model development and validation. Applied Energy, 168, 257-268.",
+      "kunye_durumu": "DOGRULANDI (web, 18.09.2026)",
+      "icerik_durumu": "DOGRULANDI (kaynagin tam metni)",
+      "ONEMLI_SAPMA": "Fiori ve ark. rejeneratif verimi YAVASLAMA DUZEYININ FONKSIYONU olarak modeller. Bizim kararli-hal formulasyonumuzda ivme profili yok; sabit eta_regen kullaniyoruz. Bu bir BASITLESTIRMEDIR ve makalede acikca beyan edilmistir; duyarlilik analizinde eta_regen taranmistir."
+    },
+    "potansiyel_donusumu": {
+      "kunye": "Eisner, J., Funke, S. & Storandt, S. (2011). Optimal route planning for electric vehicles in large networks. Proceedings of the AAAI Conference on Artificial Intelligence, 25(1), 1108-1113.",
+      "kunye_durumu": "DOGRULANDI (web, 18.09.2026)",
+      "icerik_durumu": "DOGRULANDI (kaynagin tam metni): Johnson'in potansiyel kaydirma teknigi; pratik senaryolarda phi DOGRUDAN dugum YUKSELTISINE esitleniyor (phi = eta). Bizim kullanimimizla birebir ortusuyor."
+    },
+    "DEM": {
+      "kunye": "European Space Agency (2021). Copernicus Global Digital Elevation Model GLO-90. https://doi.org/10.5270/ESA-c5d3d65",
+      "kunye_durumu": "DOGRULANDI",
+      "erisim": "AWS Open Data, anonim, 118 pafta, 0,49 GB, 18.09.2026"
+    }
+  }
+}

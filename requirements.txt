@@ -1,0 +1,17 @@
+numpy==1.26.4
+scipy==1.11.4
+pandas==2.3.3
+geopandas==1.1.4
+shapely==2.1.2
+rasterio==1.4.4
+osmium==4.3.1
+statsmodels==0.14.4
+libpysal==4.13.0
+esda==2.7.0
+spreg==1.9.0
+matplotlib==3.7.5
+requests==2.31.0
+openpyxl==3.1.5
+pdfplumber==0.11.7
+pymupdf==1.27.2.3
+gurobipy==12.0.0
