@@ -64,6 +64,31 @@ def erlang_c(c, a):
 
 par = json.load(open(os.path.join(V, "faz2c_lambda_param.json"), encoding="utf-8"))
 sk = pd.read_csv(os.path.join(V, "faz2c_soket_lambda.csv"))
+# revizyon: istasyon talebinin dagitimina alternatifler. Il x tur havuz toplami KORUNUR,
+# yalnizca havuz icindeki paylasim degisir. Temel: etkin gucle orantili (faz2c).
+#   soket      : havuz talebi soketlere esit bolunur
+#   ilce_nufus : havuz talebi ilcelere ilce nufusuyla orantili, ilce icinde etkin gucle orantili
+DAG = sys.argv[sys.argv.index("--dagitim") + 1] if "--dagitim" in sys.argv else None
+if DAG:
+    _hav = sk.il_ad.astype(str) + "|" + sk.tip
+    _top = sk.groupby(_hav.values).oturum_ay_kal.transform("sum").values
+    if DAG == "soket":
+        _w = np.ones(len(sk))
+    elif DAG == "ilce_nufus":
+        _il = pd.read_csv(os.path.join(V, "faz0_ilce.csv"))
+        _pop = sk.merge(_il[["il_ad", "ilce_ad", "nufus"]].drop_duplicates(["il_ad", "ilce_ad"]),
+                        on=["il_ad", "ilce_ad"], how="left").nufus.values
+        _pop = np.where(np.isfinite(_pop), _pop, np.nanmedian(_pop))
+        _ik = (sk.il_ad.astype(str) + "|" + sk.ilce_ad.astype(str) + "|" + sk.tip).values
+        _pw = sk.P_etkin.values / pd.Series(sk.P_etkin.values).groupby(_ik).transform("sum").values
+        _w = _pop * _pw                                   # ilce payi (nufus) x ilce ici guc payi
+    else:
+        raise SystemExit("--dagitim soket|ilce_nufus")
+    _wt = pd.Series(_w).groupby(_hav.values).transform("sum").values
+    _eski = sk.oturum_ay_kal.values.copy()
+    sk["oturum_ay_kal"] = _top * _w / np.maximum(_wt, 1e-12)
+    print("DAGITIM %s: toplam korundu (fark %.2e) | soket talebi ile temel arasindaki korelasyon %.3f"
+          % (DAG, sk.oturum_ay_kal.sum() - _eski.sum(), np.corrcoef(_eski, sk.oturum_ay_kal.values)[0, 1]))
 g = sk.groupby(["ist_no", "tip"]).agg(c=("P_etkin", "size"), oturum_ay=("oturum_ay_kal", "sum"),
                                       kw=("P_etkin", "sum"), il_ad=("il_ad", "first"),
                                       ilce_ad=("ilce_ad", "first")).reset_index()
@@ -85,12 +110,12 @@ g["S_K3"] = g.S_K1 * g.aninda_hizmet
 g["S_K1g"] = g.kw
 g["S_K3g"] = g.kw * g.aninda_hizmet
 g["pi"] = PI
-# alternatif gosterge (revizyon): P(W <= t) = 1 - C exp(-(c mu - lambda) t); kararsiz sistemde 0
+# alternatif gosterge revizyon: P(W <= t) = 1 - C exp(-(c mu - lambda) t); kararsiz sistemde 0
 _kar = g.rho < 1.0
 g["hizmet10"] = np.where(_kar, 1.0 - g.ErlangC * np.exp(-(g.c * g.mu_sa - g.lambda_sa).clip(lower=0) * T_BEKLE), 0.0)
 g.loc[g.lambda_sa <= 0, "hizmet10"] = 1.0
 
-# Monte Carlo (revizyon): faz2c'de kalibre edilen log-normal soket carpani UYGULANIR.
+# Monte Carlo revizyon: faz2c'de kalibre edilen log-normal soket carpani UYGULANIR.
 # Soket carpani M = exp(sigma z - sigma^2/2), z~N(0,1); il x tur havuzu icinde yeniden normalize
 # edilir (il talep toplamlari korunur). Istasyon lambdasi soket toplamidir; Erlang-C yeniden hesaplanir.
 if MC:
@@ -111,7 +136,7 @@ if MC:
     print("Monte Carlo: %d tekrar (tohum %d...) | aninda hizmet ort. (deterministik %.4f) -> MC ort. %.4f"
           % (MC, TOHUM, g.aninda_hizmet.mean(), g[["aninda_mc%d" % r for r in range(MC)]].values.mean()))
 
-ek = ("_" + SEN) if SEN else ("" if PI == 1.0 else "_pi%g" % PI)
+ek = (("_" + SEN) if SEN else ("" if PI == 1.0 else "_pi%g" % PI)) + (("_dag" + DAG) if DAG else "")
 g.to_csv(os.path.join(V, "faz6_istasyon_k3%s.csv" % ek), index=False, encoding="utf-8-sig")
 
 print("YUK SENARYOSU pi = %.2f" % PI)

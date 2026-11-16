@@ -41,10 +41,10 @@ BUTCE = float(sys.argv[sys.argv.index("--butce") + 1]) if "--butce" in sys.argv 
 NOKTA = int(sys.argv[sys.argv.index("--nokta") + 1]) if "--nokta" in sys.argv else 12
 KADD = KNEW = int(sys.argv[sys.argv.index("--k") + 1]) if "--k" in sys.argv else 6   # soket ust siniri
 _arg = lambda ad, vars: type(vars)(sys.argv[sys.argv.index(ad) + 1]) if ad in sys.argv else vars
-FIYAT = {"AC": _arg("--acfiyat", 8_000.0), "DC": _arg("--dcfiyat", 100_000.0)}   # revizyon: duyarlilik
+FIYAT = {"AC": _arg("--acfiyat", 8_000.0), "DC": _arg("--dcfiyat", 100_000.0)}   # revizyon
 SABIT = _arg("--sabit", 50_000.0)
-NEXP = _arg("--nexp", 1200)                                                  # revizyon: aday kumesi
-GAP = _arg("--gap", 0.005)                                                   # revizyon:
+NEXP = _arg("--nexp", 1200)                                                  # revizyon
+GAP = _arg("--gap", 0.005)                                                   # revizyon
 TLIM = _arg("--sure", 300.0)
 NOKTA_SEC = [int(x) for x in sys.argv[sys.argv.index("--noktalar") + 1].split(",")] if "--noktalar" in sys.argv else None
 SON = "" if PI == "1" else "_pi%s" % PI
@@ -112,15 +112,31 @@ for t in ("AC", "DC"):
     print("[%s] genisleme adayi istasyon: %d" % (t, len(sec[t])), flush=True)
 
 # --- f degerleri ---
+# revizyon: talep varsayimi. Temel ("oransal"): mevcut istasyonda gelis sabit, yeni istasyonun
+# yuku soket sayisiyla orantili (a = k * rho_med). Alternatifler:
+#   sabit          : yeni istasyonun yuku soket sayisindan bagimsiz, medyan istasyon yukune esit (mevcutla simetrik)
+#   sifir          : yeni istasyonda tikaniklik yok (a = 0), esitlik maliyetinin alt siniri
+#   mevcut_oransal : mevcut istasyonda da yuk eklenen soketle orantili artar (a_j (n+k)/n), yeniyle simetrik
+YUK = sys.argv[sys.argv.index("--yuk") + 1] if "--yuk" in sys.argv else "oransal"
+A_MED = {t: float(k3[(k3.tip == t) & (k3.a > 0)].a.median()) for t in ("AC", "DC")}
+if YUK not in ("oransal", "sabit", "sifir", "mevcut_oransal"):
+    raise SystemExit("--yuk oransal|sabit|sifir|mevcut_oransal")
+print("Talep varsayimi: %s | medyan istasyon yuku AC %.4f, DC %.4f Erlang" % (YUK, A_MED["AC"], A_MED["DC"]), flush=True)
+
+
 def f_mevcut(t, j, k):
     n = n0[t][j] + k
-    return n * MU[t] * (1 - erlang_c(n, A_yuk[t][j]))
+    a = A_yuk[t][j] * (n / max(n0[t][j], 1)) if YUK == "mevcut_oransal" else A_yuk[t][j]
+    return n * MU[t] * (1 - erlang_c(n, a))
 
 
 def f_yeni(t, k):
     if k <= 0:
         return 0.0
-    return k * MU[t] * (1 - erlang_c(k, k * RHO_MED[t]))
+    if YUK == "sifir":
+        return k * MU[t]
+    a = A_MED[t] if YUK == "sabit" else k * RHO_MED[t]
+    return k * MU[t] * (1 - erlang_c(k, a))
 
 
 na = len(IX["aday_sid"])
@@ -174,7 +190,7 @@ for d in range(nd):
 M.update()
 print("Model: %d degisken (%d ikili), %d kisit | %.0f sn" % (M.NumVars, M.NumBinVars, M.NumConstrs, time.time() - t0), flush=True)
 
-# --- revizyon (02.10.2026): yalnizca BASLANGICTA sifir olan ilceler icin esik ---
+# --- revizyon: yalnizca BASLANGICTA sifir olan ilceler icin esik ---
 # Pareto adimi esigi BUTUN ilcelere uygular (mmin); burada esik yalnizca A0 = 0 olan ilcelere konur ve
 # verim maksimize edilir. Boylece "dokuz ilceyi erisime kavusturmanin" en dusuk verim kaybi bulunur.
 if "--hedef9" in sys.argv:
@@ -203,7 +219,7 @@ if "--hedef9" in sys.argv:
               % (ad, th, r9["verim"], r9["kayip_%"], r9["yeni_istasyon"], har_yeni / 1e6, r9["dokuz_ilce_min"],
                  r9["ulusal_min"], r9["gap_%"]), flush=True)
         M.remove(kis)
-    pd.DataFrame(sat9).to_csv(os.path.join(V, "faz11c_dokuz_ilce_hedefi.csv"), index=False, encoding="utf-8-sig")
+    pd.DataFrame(sat9).to_csv(os.path.join(V, "faz11c_dokuz_ilce_hedefi%s.csv" % (sys.argv[sys.argv.index("--ek") + 1] if "--ek" in sys.argv else "")), index=False, encoding="utf-8-sig")
     print("Kaydedildi: faz11c_dokuz_ilce_hedefi.csv")
     sys.exit(0)
 

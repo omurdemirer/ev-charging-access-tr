@@ -105,7 +105,7 @@ for _pi_son, _etiket in (("", ""), ("_pi5", "p5"), ("_pi8", "p8"),
     _f = _k3_carpan(S.ist_no.values, _pi_son)
     ARZ["NOM3" + _etiket] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
     ARZ["K13" + _etiket] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
-# revizyon: (30.09.2026): K3_EK=1 ise 10 dk icinde hizmet gostergesi (K13w) ve Monte Carlo
+# revizyon: K3_EK=1 ise 10 dk icinde hizmet gostergesi (K13w) ve Monte Carlo
 # cekilisleri (K13_mc*) eklenir; yalniz birincil koşuda kullanilir (hesap yuku)
 if os.environ.get("K3_EK") == "1":
     for _pi_son, _etiket in (("", ""), ("_pi5", "p5"), ("_pi8", "p8")):
@@ -117,7 +117,7 @@ if os.environ.get("K3_EK") == "1":
             _f = _k3_carpan(S.ist_no.values, _pi_son, _k)
             ARZ["NOM3" + _etiket + "_" + _k[7:]] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
             ARZ["K13" + _etiket + "_" + _k[7:]] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
-# revizyon: (30.09.2026): X42=1 ise koordinati duzeltilip ilce merkezine tasinan istasyonlar arzdan
+# revizyon: X42=1 ise koordinati duzeltilip ilce merkezine tasinan istasyonlar arzdan
 # cikarilir (arz sifir); yalniz NOM/K1 ve cikarilmis surumleri hesaplanir, cikti "_x42" ekiyle yazilir
 X42 = os.environ.get("X42") == "1"
 if X42:
@@ -126,6 +126,20 @@ if X42:
     ARZ = {"NOM": ARZ["NOM"], "K1": ARZ["K1"],
            "NOMx42": {t: np.where(_tas, 0.0, ARZ["NOM"][t]) for t in ("AC", "DC")},
            "K1x42": {t: np.where(_tas, 0.0, ARZ["K1"][t]) for t in ("AC", "DC")}}
+# revizyon: K3_R1=1 ise (a) butun yuklerde anlik ve 10 dk gostergeleri,
+# (b) alternatif talep dagitimlari (soket, ilce_nufus) 1, 5 ve 8 kat yukte eklenir.
+if os.environ.get("K3_R1") == "1":
+    _R1 = [("_pi1.5", "p1.5"), ("_pi3", "p3"), ("_pi12", "p12")]
+    for _d in ("soket", "ilce_nufus"):
+        _R1 += [("_dag" + _d, "d" + _d), ("_pi5_dag" + _d, "p5d" + _d), ("_pi8_dag" + _d, "p8d" + _d)]
+    for _pi_son, _etiket in _R1:
+        _f = _k3_carpan(S.ist_no.values, _pi_son)
+        ARZ["NOM3" + _etiket] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
+        ARZ["K13" + _etiket] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
+        if not _etiket.startswith(("d", "p5d", "p8d")):
+            _f = _k3_carpan(S.ist_no.values, _pi_son, "hizmet10")
+            ARZ["NOM3w" + _etiket] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
+            ARZ["K13w" + _etiket] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
 print("ARZ tanimlari: %s" % ", ".join(ARZ))
 
 

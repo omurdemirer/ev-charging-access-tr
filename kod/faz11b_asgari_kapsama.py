@@ -1,4 +1,4 @@
-"""Faz 11b — Sifir ortalama erisimli ilceleri kapsamanin ASGARI maliyeti (revizyon, 30.09.2026).
+"""Faz 11b — Sifir ortalama erisimli ilceleri kapsamanin ASGARI maliyeti revizyon.
 
 Ana model (faz11) tam butceli bir cozumun yatirim bilesimini verir; oradaki 6,2 milyon dolar asgari
 kapsama maliyeti degildir. Burada yalnizca YENI istasyonlarla, her sifir-erisimli ilcenin erisimini
@@ -81,19 +81,75 @@ M_ilce = pd.read_csv(os.path.join(V, "osm", "ilce_merkez.csv")).set_index("shape
 K = pd.read_csv(os.path.join(V, "osm", "izgara_koken.csv"))
 ag = Ag(os.path.join(V, "osm"))
 Gk_r = ag.Gk.T.tocsr()
+KOORD = {c: (float(M_ilce.loc[aday[c]].lon), float(M_ilce.loc[aday[c]].lat)) for c in C_ilgili}
+
+# revizyon: aday konum kisiti testi. --aday_ek N ile her sifir-erisimli ilcede, ilce merkezine
+# ek olarak en kalabalik N koken hucresi aday konum olur. Katsayilar faz10_katsayi.py ile AYNI tanimla
+# (kenara baglama, iki uc dugumden ters graf aramasi, tum Turkiye kokenleri uzerinden 2SFCA paydasi) hesaplanir.
+NEK = int(sys.argv[sys.argv.index("--aday_ek") + 1]) if "--aday_ek" in sys.argv else 0
+if NEK:
+    def W_gauss(dd, p):
+        return np.where(dd <= p, (np.exp(-dd * dd / (2 * p * p)) - np.exp(-0.5)) / (1 - np.exp(-0.5)), 0.0)
+    sira = np.argsort(K.dugum.values, kind="stable")
+    o_dug = K.dugum.values[sira].astype(np.int64); o_pop = K.nufus.values[sira]
+    o_bag = K.baglanma_km.values[sira]; o_sid = K.shapeID.values[sira]
+    sid_i = {s_: i for i, s_ in enumerate(sid)}
+    o_di = np.array([sid_i.get(s_, -1) for s_ in o_sid], dtype=np.int64)
+    ptr = np.searchsorted(o_dug, np.arange(ag.N + 1))
+    P_d = MV["P_d"]
+    ek = (K[K.shapeID.isin([sid[d] for d in sifir])].sort_values("nufus", ascending=False)
+          .groupby("shapeID").head(NEK).reset_index(drop=True))
+    hs = ag.kenara_bagla(ek.lon.values, ek.lat.values)
+    for i in range(len(ek)):
+        c = na + i; KOORD[c] = (float(ek.lon[i]), float(ek.lat[i]))
+        ga, gb = int(hs["ga"][i]), int(hs["gb"][i])
+        Dk = dijkstra(Gk_r, directed=True, indices=[ga, gb], limit=max(HAVZA.values()) + 0.1)
+        ulas = np.nonzero(np.isfinite(Dk[0]) | np.isfinite(Dk[1]))[0]
+        say = ptr[ulas + 1] - ptr[ulas]; ulas = ulas[say > 0]; say = say[say > 0]
+        oi = np.repeat(ptr[ulas], say) + (np.arange(say.sum()) - np.repeat(np.cumsum(say) - say, say))
+        dn = np.repeat(np.arange(len(ulas)), say)
+        fr = hs["frac"][i]
+        ka = Dk[0][ulas] + fr * hs["e_km"][i] if hs["fwd"][i] else np.full(len(ulas), np.inf)
+        kb = Dk[1][ulas] + (1 - fr) * hs["e_km"][i] if hs["rev"][i] else np.full(len(ulas), np.inf)
+        d_km = np.minimum(ka, kb)[dn] + o_bag[oi] + hs["baglanma_km"][i]
+        for t in ("AC", "DC"):
+            W = W_gauss(d_km, HAVZA[t]); nz = (W > 0) & (o_di[oi] >= 0)
+            if not nz.any():
+                continue
+            ii, w = oi[nz], W[nz]; talep = float(np.sum(o_pop[ii] * w))
+            pay = np.bincount(o_di[ii], weights=o_pop[ii] * w, minlength=nd)
+            for d in sifir:
+                if pay[d] > 0:
+                    kat[(int(d), c, t)] = float(pay[d] / max(P_d[d], 1e-9) / talep)
+    C_ilgili = sorted({c for (_, c, _) in kat})
+    print("Ek aday: ilce basina %d koken hucresi, toplam %d | bu ilcelere ulasan aday konum: %d"
+          % (NEK, len(ek), len(C_ilgili)), flush=True)
+
+
+def kapsa_vektor(c, t, hedef):
+    """(c, t) adayinin hedef kokenlerden hangilerini havza icinde kapsadigi (kapsama() ile ayni ag erisimi)."""
+    hd = hedef.dugum.values.astype(int)
+    lo, la = KOORD[c]
+    hs = ag.kenara_bagla(np.array([lo]), np.array([la]))
+    ga, gb = int(hs["ga"][0]), int(hs["gb"][0])
+    Dk = dijkstra(Gk_r, directed=True, indices=[ga, gb], limit=HAVZA[t] + 0.1)
+    fr = hs["frac"][0]
+    ka = Dk[0][hd] + fr * hs["e_km"][0] if hs["fwd"][0] else np.full(len(hd), np.inf)
+    kb = Dk[1][hd] + (1 - fr) * hs["e_km"][0] if hs["rev"][0] else np.full(len(hd), np.inf)
+    return (np.minimum(ka, kb) + hedef.baglanma_km.values + hs["baglanma_km"][0]) < HAVZA[t]
 
 
 def kapsama(secim):
     """Secilen (aday c, tur t) cozumunun dokuz ilcedeki koken nufusu kapsama orani.
-    revizyon (02.10.2026): faz10_katsayi.py ile AYNI ag erisimi kullanilir: ilce merkezi en yakin
+    revizyon: faz10_katsayi.py ile AYNI ag erisimi kullanilir: ilce merkezi en yakin
     KENARA baglanir (kenar ici konum + yon izinleri + baglanti bacagi), ters grafta iki uc dugumden arama
     yapilir ve Gauss agirligi pozitif (d < havza) olan kokenler kapsanmis sayilir."""
     hedef = K[K.shapeID.isin([sid[d] for d in sifir])]
     hd = hedef.dugum.values.astype(int)
     kaps = np.zeros(len(hedef), bool)
     for c, t in secim:
-        r = M_ilce.loc[aday[c]]
-        hs = ag.kenara_bagla(np.array([float(r.lon)]), np.array([float(r.lat)]))
+        lo, la = KOORD[c]
+        hs = ag.kenara_bagla(np.array([lo]), np.array([la]))
         ga, gb = int(hs["ga"][0]), int(hs["gb"][0])
         Dk = dijkstra(Gk_r, directed=True, indices=[ga, gb], limit=HAVZA[t] + 0.1)
         fr = hs["frac"][0]
@@ -123,14 +179,43 @@ for ad, theta in (("kume_kapsama", None), ("yuzdelik10", theta10)):
     M.setObjective(gp.quicksum(SABIT * z[c] for c in C_ilgili)
                    + gp.quicksum(FIYAT[t] * k * u[c, t, k] for (c, t, k) in u), GRB.MINIMIZE)
     M.optimize()
+    if "--kapsama_max" in sys.argv:
+        # revizyon: ikinci asama. Asgari maliyet sabitken dokuz ilcede kapsanan koken nufusu en buyuklenir
+        # (birinci asamada esit maliyetli cozumler arasindaki secim kapsamaya kayitsizdir).
+        opt = M.ObjVal; hedef = K[K.shapeID.isin([sid[d] for d in sifir])].reset_index(drop=True)
+        kap_set = {}
+        for c in C_ilgili:
+            for t in ("AC", "DC"):
+                kap_set[c, t] = np.nonzero(kapsa_vektor(c, t, hedef))[0]
+        x = M.addVars(len(hedef), lb=0.0, ub=1.0, name="x")
+        ort = {}
+        for (c, t), ii in kap_set.items():
+            for o in ii:
+                ort.setdefault(int(o), []).append((c, t))
+        for o in range(len(hedef)):
+            M.addConstr(x[o] <= gp.quicksum(u[c, t, k] for (c, t) in ort.get(o, []) for k in range(1, KNEW + 1)))
+        maliyet = (gp.quicksum(SABIT * z[c] for c in C_ilgili)
+                   + gp.quicksum(FIYAT[t] * k * u[c, t, k] for (c, t, k) in u))
+        kapsanan = gp.quicksum(float(hedef.nufus[o]) * x[o] for o in range(len(hedef)))
+        if "--kapsama_hedef" in sys.argv:   # dokuz ilce nufusunun en az q'sunu kapsayan asgari maliyet
+            q = float(sys.argv[sys.argv.index("--kapsama_hedef") + 1])
+            M.addConstr(kapsanan >= q * float(hedef.nufus.sum()))
+            M.setObjective(maliyet, GRB.MINIMIZE); M.Params.MIPGap = 1e-4
+            M.optimize(); opt = M.ObjVal
+        else:
+            M.addConstr(maliyet <= opt + 1.0)
+            M.setObjective(kapsanan, GRB.MAXIMIZE)
+            M.optimize()
     secim = [(c, t) for (c, t, k) in u if u[c, t, k].X > 0.5]
     kap, top = kapsama(secim)
-    r = {"esik": ad, "theta": theta, "maliyet_usd": M.ObjVal, "yeni_istasyon": int(sum(z[c].X > 0.5 for c in C_ilgili)),
+    r = {"esik": ad, "theta": theta, "aday_ek": NEK, "ek_secilen": int(sum(z[c].X > 0.5 for c in C_ilgili if c >= na)),
+         "maliyet_usd": opt if "--kapsama_max" in sys.argv else M.ObjVal, "yeni_istasyon": int(sum(z[c].X > 0.5 for c in C_ilgili)),
          "ac_soket": int(sum(k for (c, t, k) in u if t == "AC" and u[c, t, k].X > 0.5)),
          "dc_soket": int(sum(k for (c, t, k) in u if t == "DC" and u[c, t, k].X > 0.5)),
          "kapsanan_nufus": kap, "dokuz_ilce_nufus": top, "kapsama_%": 100 * kap / top, "gap": M.MIPGap}
     sat.append(r)
     print("%-15s maliyet %.3f M$ | yeni istasyon %d (AC soket %d, DC soket %d) | dokuz ilce nufusunun %%%.1f'i kapsanir"
           % (ad, r["maliyet_usd"] / 1e6, r["yeni_istasyon"], r["ac_soket"], r["dc_soket"], r["kapsama_%"]))
-pd.DataFrame(sat).to_csv(os.path.join(V, "faz11b_asgari_kapsama.csv"), index=False, encoding="utf-8-sig")
-print("Kaydedildi: faz11b_asgari_kapsama.csv")
+CK = "faz11b_asgari_kapsama%s%s.csv" % ("_ek%d" % NEK if NEK else "", ("_kmax" + ("_q" + sys.argv[sys.argv.index("--kapsama_hedef") + 1] if "--kapsama_hedef" in sys.argv else "")) if "--kapsama_max" in sys.argv else "")
+pd.DataFrame(sat).to_csv(os.path.join(V, CK), index=False, encoding="utf-8-sig")
+print("Kaydedildi:", CK)

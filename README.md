@@ -4,7 +4,7 @@ Code and derived results for the study:
 
 > Demirer, Ö. *Same stations, different inequality: opposing effects of service speed,
 > energy-distance and queueing definitions on measured electric vehicle charging access.*
-> Manuscript submitted for publication.
+> Revised manuscript under review (Applied Energy).
 
 The study measures public EV charging accessibility for the whole of Türkiye (13,067 public
 stations, 175,175 population origins, 969 districts) with a type-specific enhanced two-step
@@ -16,7 +16,7 @@ decomposition. A bi-objective mixed-integer model, built on the distance catchme
 results to investment.
 
 Archived version: [doi:10.5281/zenodo.23037338](https://doi.org/10.5281/zenodo.23037338) ·
-this release: **v1.1.1** (5 Oct 2026; v1.1.0 of 2 Oct 2026 plus a corrected centre budget share)
+this release: **v1.2.0** (16 Nov 2026; adds the robustness analyses of the revised manuscript, Appendix Tables A.4–A.10 and the extended Table 8; v1.1.1 of 5 Oct 2026 is the first-submission version)
 
 Author: Ömür DEMİRER, Hitit University — ORCID [0000-0002-9502-9935](https://orcid.org/0000-0002-9502-9935)
 
@@ -76,6 +76,18 @@ The revision batches are in `kod/calistir/`: `enerji_zinciri.sh` (all energy var
 `mc_shapley.sh` (Monte Carlo Shapley ranges), `milp_duyarlilik.sh` (tight-gap Pareto fronts,
 cost sensitivities, nine-district target and minimum cover) and `regresyon_ve_kalibrasyon.sh`.
 
+Version 1.2.0 adds `calistir/revizyon_saglamlik.sh`, which runs all robustness analyses of the
+revised manuscript: alternative catchments with recalibrated energy budgets (`HAVZA_ALT=3mil|AC15mil`),
+alternative budget definitions (`BUTCE_ALT=<name>:<AC>,<DC>`), the tunnel and bridge elevation
+correction (`faz4t_tunel_kopru.py`, then `faz4_enerji_kenar.py --tunel`), vehicle variants
+(`--kutle`, `--hizk`, `--verim`), demand allocation rules (`faz6_kuyruk_k3.py --dagitim soket|ilce_nufus`,
+then `K3_R1=1` in `faz3`/`faz5`), winter with 90% and 80% of the summer budget, tie handling in the
+decile transition (`faz5d_esitlik_duyarliligi.py`), inequality measures other than the Gini
+(`faz7b_gostergeler.py`), the load and allocation summary (`faz7d_yuk_ozet.py`), the energy-distance
+variant summary (`faz7c_varyant_ozet.py`), load assumptions in the investment model
+(`faz11_optimizasyon.py --yuk sabit|sifir|mevcut_oransal`) and the extended candidate set with
+coverage maximisation (`faz11b_asgari_kapsama.py --kapsama_max [--kapsama_hedef q] [--aday_ek 20]`).
+
 ## Random seeds
 
 | Use | Seed |
@@ -97,6 +109,14 @@ cost sensitivities, nine-district target and minimum cover) and `regresyon_ve_ka
 | Section 4.6 (slope limit, relocated stations) | `faz7_shapley_egim0.15.csv`, `faz7_shapley_egim0.25.csv`, `faz5_enerjik_egim*_ozet.csv`, `faz3_esitsizlik_ozet_x42.csv` |
 | Table A.1 (energy budgets) | `faz5_kalibrasyon*.json`, `faz4_ebar*.json` |
 | Table A.2 (eight Shapley configurations) | `faz7_yapilandirma.csv`, `faz7_yapilandirmap5.csv`, `faz7_yapilandirmap8.csv` |
+| Table 8, 90% and 80% winter budget columns | `faz7_shapleyKIS_paux2.2_bkis90.csv`, `faz7_shapleyKIS_paux2.2_bkis80.csv`, `faz5_enerjik_paux2.2_bkis*_ozet.csv` |
+| Table A.4 (other inequality measures) | `faz7b_gostergeler.csv`, `faz7b_gostergelerp8.csv` |
+| Tables A.5–A.6 (load levels, 10-minute indicator, demand allocation) | `faz7d_yuk_gosterge_dagitim.csv`, `faz7b_gostergeler*.csv`, `faz6_istasyon_k3*_dag*.csv` |
+| Table A.7 (candidate set) | `faz11b_asgari_kapsama_kmax*.csv`, `faz11b_asgari_kapsama_ek20_kmax*.csv` |
+| Table A.8 (load assumptions in the investment model) | `faz11_pareto_B100M_yuk*.csv`, `faz11c_dokuz_ilce_hedefi_yuk*.csv` |
+| Table A.9 (Shapley shares by catchment) | `faz7b_gostergeler_h3mil.csv`, `faz7b_gostergeler_hAC15mil.csv`, `faz7b_gostergelerp8_h*.csv`, `faz5_kalibrasyon_h*.json` |
+| Table A.10 (energy-distance variants) | `faz7c_varyant_ozet.csv`, `faz5_enerjik_*_ozet.csv`, `faz4_ebar_*.json`, `faz5_kalibrasyon_*.json` |
+| Section 4.6 (tie handling) | `faz5d_esitlik_duyarliligi.csv` |
 | Figure 5 (decile transitions) | `faz5c_dilim_gecisi.csv` |
 | Figure 6 (Shapley shares) | `faz7_shapley*.csv` |
 | Figure 7 (supply loss by load) | `faz6_istasyon_k3*.csv` |

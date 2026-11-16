@@ -25,6 +25,14 @@ V = os.path.join(HERE, "..", "veri")
 OSM = os.path.join(V, "osm")
 MIL = 1.609344
 KM0 = {"AC": 5 * MIL, "DC": 25 * MIL}
+# revizyon: HAVZA_ALT ile butce baska bir km havzasina eslestirilir (3mil, AC15mil)
+HAVZA_ALT = os.environ.get("HAVZA_ALT", "")
+if HAVZA_ALT == "3mil":
+    KM0 = {"AC": 3 * MIL, "DC": 3 * MIL}
+elif HAVZA_ALT == "AC15mil":
+    KM0 = {"AC": 15 * MIL, "DC": 25 * MIL}
+elif HAVZA_ALT:
+    raise SystemExit("HAVZA_ALT: 3mil | AC15mil")
 EBAR = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "veri",
                                    "faz4_ebar%s.json" % os.environ.get("ENERJI_EK", "")), encoding="utf-8"))["ebar_kWh_per_km"]
 MARJ = 5.0
@@ -52,7 +60,7 @@ n_dc = g_[("n", "DC")].reindex(S.ist_no).fillna(0).values
 kk = pd.Series(list(zip(hs["ga"], hs["gb"])))
 gruplar = kk.groupby(kk).groups
 anahtarlar = list(gruplar)
-TOHUM = int(sys.argv[sys.argv.index("--tohum") + 1]) if "--tohum" in sys.argv else 20260918   # revizyon (02.10.2026): ornek oynakligi
+TOHUM = int(sys.argv[sys.argv.index("--tohum") + 1]) if "--tohum" in sys.argv else 20260918   # revizyon: ornek oynakligi
 rng = np.random.default_rng(TOHUM)
 sec = rng.choice(len(anahtarlar), size=min(ornek, len(anahtarlar)), replace=False)
 anahtarlar = [anahtarlar[i] for i in sec]
@@ -65,7 +73,7 @@ for gi, key in enumerate(anahtarlar):
     tip = "DC" if (n_dc[idx] > 0).any() else "AC"
     ebar0 = EBAR
     Dk = dijkstra(Gk_r, directed=True, indices=[ga, gb], limit=KM0[tip] + 0.1)
-    # kesin sinir (revizyon): butce 1,5*KM0*ebar0'a kadar aranir + potansiyel farki PHIMAX - phi(g)
+    # kesin sinir revizyon: butce 1,5*KM0*ebar0'a kadar aranir + potansiyel farki PHIMAX - phi(g)
     De = dijkstra(Ge_r, directed=True, indices=[ga, gb], limit=1.5 * KM0[tip] * ebar0 + PHIMAX - min(phi[ga], phi[gb]))
     ulas = np.nonzero(np.isfinite(Dk[0]) | np.isfinite(Dk[1]) | np.isfinite(De[0]) | np.isfinite(De[1]))[0]
     if not len(ulas):
@@ -110,5 +118,5 @@ for tip in ("AC", "DC"):
     print("   kapsanan cift orani: km %.3f vs enerji %.3f | ortalama gerceklesen oran %.4f kWh/km (n=%d)"
           % ((dkm <= KM0[tip]).mean(), ic.mean(), np.average(dkwh[g] / dkm[g], weights=P[g]), g.sum()))
 json.dump({"E0_kalibre": sonuc, "yontem": "nufus-eslesmeli", "ornek_kenar": len(anahtarlar)},
-          open(os.path.join(V, "faz5_kalibrasyon%s%s.json" % (os.environ.get("ENERJI_EK", ""), ("_tohum%d" % TOHUM) if "--tohum" in sys.argv else "")), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          open(os.path.join(V, "faz5_kalibrasyon%s%s%s.json" % (os.environ.get("ENERJI_EK", ""), ("_h" + HAVZA_ALT) if HAVZA_ALT else "", ("_tohum%d" % TOHUM) if "--tohum" in sys.argv else "")), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print("\nToplam sure %.0f sn" % (time.time() - t0))

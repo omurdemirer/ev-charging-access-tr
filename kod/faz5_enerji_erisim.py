@@ -47,6 +47,19 @@ if "--kalibre" in sys.argv:
     ETIKET = "ENERJIK"; EKD = os.environ.get("ENERJI_EK", "")
     if "ENERJI_BUTCE_EK" in os.environ:
         EKD += "_sabit" + (_bek or "birincil")
+    # revizyon: HAVZA_ALT -> butce o km havzasina eslestirilmis kalibrasyondan
+    if os.environ.get("HAVZA_ALT"):
+        _h = os.environ["HAVZA_ALT"]
+        _k = json.load(open(os.path.join(V, "faz5_kalibrasyon%s_h%s.json" % (os.environ.get("ENERJI_EK", ""), _h)),
+                            encoding="utf-8"))["E0_kalibre"]
+        E0 = {t: float(_k[t]) for t in ("AC", "DC")}
+        EKD += "_h" + _h
+    # revizyon: BUTCE_ALT="ad:AC,DC" -> butce dogrudan verilir (karsilastirma olcutu testi)
+    if os.environ.get("BUTCE_ALT"):
+        _ad, _v = os.environ["BUTCE_ALT"].split(":")
+        _ac, _dc = (float(x) for x in _v.split(","))
+        E0 = {"AC": _ac, "DC": _dc}
+        EKD += "_b" + _ad
 deneme = int(sys.argv[sys.argv.index("--deneme") + 1]) if "--deneme" in sys.argv else 0
 t0 = time.time()
 
@@ -114,7 +127,7 @@ for _pi_son, _etiket in (("", ""), ("_pi5", "p5"), ("_pi8", "p8"),
     _f = _k3_carpan(S.ist_no.values, _pi_son)
     ARZ["NOM3" + _etiket] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
     ARZ["K13" + _etiket] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
-# revizyon: (30.09.2026): K3_EK=1 ise 10 dk icinde hizmet gostergesi (K13w) ve Monte Carlo
+# revizyon: K3_EK=1 ise 10 dk icinde hizmet gostergesi (K13w) ve Monte Carlo
 # cekilisleri (K13_mc*) eklenir; yalniz birincil koşuda kullanilir (hesap yuku)
 if os.environ.get("K3_EK") == "1":
     for _pi_son, _etiket in (("", ""), ("_pi5", "p5"), ("_pi8", "p8")):
@@ -126,6 +139,20 @@ if os.environ.get("K3_EK") == "1":
             _f = _k3_carpan(S.ist_no.values, _pi_son, _k)
             ARZ["NOM3" + _etiket + "_" + _k[7:]] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
             ARZ["K13" + _etiket + "_" + _k[7:]] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
+# revizyon: K3_R1=1 ise (a) butun yuklerde anlik ve 10 dk gostergeleri,
+# (b) alternatif talep dagitimlari (soket, ilce_nufus) 1, 5 ve 8 kat yukte eklenir.
+if os.environ.get("K3_R1") == "1":
+    _R1 = [("_pi1.5", "p1.5"), ("_pi3", "p3"), ("_pi12", "p12")]
+    for _d in ("soket", "ilce_nufus"):
+        _R1 += [("_dag" + _d, "d" + _d), ("_pi5_dag" + _d, "p5d" + _d), ("_pi8_dag" + _d, "p8d" + _d)]
+    for _pi_son, _etiket in _R1:
+        _f = _k3_carpan(S.ist_no.values, _pi_son)
+        ARZ["NOM3" + _etiket] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
+        ARZ["K13" + _etiket] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
+        if not _etiket.startswith(("d", "p5d", "p8d")):
+            _f = _k3_carpan(S.ist_no.values, _pi_son, "hizmet10")
+            ARZ["NOM3w" + _etiket] = {t: ARZ["NOM"][t] * _f[t] for t in ("AC", "DC")}
+            ARZ["K13w" + _etiket] = {t: ARZ["K1"][t] * _f[t] for t in ("AC", "DC")}
 print("ARZ tanimlari: %s" % ", ".join(ARZ))
 
 
@@ -141,7 +168,7 @@ A = {az: np.zeros(len(K)) for az in ARZ}
 for gi, key in enumerate(anahtarlar):
     idx = np.asarray(gruplar[key])
     ga, gb = int(key[0]), int(key[1])
-    # kesin arama siniri (revizyon): E = D - phi(o) + phi(g) <= E0  <=>  D <= E0 + phi(o) - phi(g);
+    # kesin arama siniri revizyon: E = D - phi(o) + phi(g) <= E0  <=>  D <= E0 + phi(o) - phi(g);
     # phi(o) <= PHIMAX oldugundan D <= E0 + PHIMAX - phi(g) hicbir kokeni atlamaz
     lim = E0["DC" if (n_dc[idx] > 0).any() else "AC"] + PHIMAX - min(phi[ga], phi[gb])
     D = dijkstra(Ge_r, directed=True, indices=[ga, gb], limit=lim)

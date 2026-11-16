@@ -48,6 +48,17 @@ if "--egim" in sys.argv:                       # 7a duyarlilik: egim siniri (var
 V2 = "--v2" in sys.argv                         # eski bilesen bazli formulasyon (yalniz karsilastirma icin)
 if V2:
     EK += "_v2"
+# revizyon: arac turu duyarliligi. Kutle (kg), aktarma verimi ve hiz carpani.
+if "--kutle" in sys.argv:
+    m = float(sys.argv[sys.argv.index("--kutle") + 1]); EK += "_m%g" % m
+if "--verim" in sys.argv:
+    edt = float(sys.argv[sys.argv.index("--verim") + 1]); EK += "_e%g" % edt
+HIZK = float(sys.argv[sys.argv.index("--hizk") + 1]) if "--hizk" in sys.argv else 1.0
+if "--hizk" in sys.argv:
+    EK += "_v%g" % HIZK
+TUNEL = "--tunel" in sys.argv                  # revizyon: tunel/kopru yukselti duzeltmesi
+if TUNEL:
+    EK += "_tunel"
 J2K = 3.6e6
 
 zd = np.load(os.path.join(OSM, "ag_yukselti.npz"))["z_duz"].astype(np.float64)
@@ -55,6 +66,25 @@ if "--duz" in sys.argv:                        # M2 kontrolu: duz arazi (yukselt
     zd = np.zeros_like(zd)
 G = np.load(os.path.join(OSM, "ag_geometri.npz"))
 a = np.load(os.path.join(OSM, "ag.npz"))
+if TUNEL:
+    # tunel ve kopru yollarinda yer yuzeyi yerine uc noktalar arasi dogrusal yukselti (mesafeye gore)
+    _tk = np.load(os.path.join(OSM, "tunel_kopru.npz"))
+    _isaret = np.isin(a["w_osm"], _tk["osm_id"])
+    _wid = G["wid"]; _sec = _isaret[_wid]
+    _la, _lo = np.radians(G["lat"]), np.radians(G["lon"])
+    _seg = np.r_[0.0, np.hypot((_lo[1:] - _lo[:-1]) * np.cos(0.5 * (_la[1:] + _la[:-1])), _la[1:] - _la[:-1]) * 6371000.0]
+    _seg[1:][_wid[1:] != _wid[:-1]] = 0.0
+    _kum = np.cumsum(_seg)
+    _yol = np.unique(_wid[_sec])
+    _bas = np.searchsorted(_wid, _yol, side="left"); _son = np.searchsorted(_wid, _yol, side="right") - 1
+    _onc = zd.copy()
+    for i0, i1 in zip(_bas, _son):
+        if i1 > i0:
+            t = (_kum[i0:i1 + 1] - _kum[i0]) / max(_kum[i1] - _kum[i0], 1e-9)
+            zd[i0:i1 + 1] = zd[i0] + t * (zd[i1] - zd[i0])
+    _d = np.abs(zd - _onc)[_sec]
+    print("Tunel/kopru duzeltmesi: %d yol, %d kose | yukselti degisimi medyan %.1f m, 95. yuzdelik %.1f m, en buyuk %.0f m"
+          % (len(_yol), _sec.sum(), np.median(_d), np.quantile(_d, 0.95), _d.max()), flush=True)
 U, V, km, dk = a["U"], a["V"], a["km"], a["dk"]
 pa, pb, ters = a["pos_a"], a["pos_b"], a["ters"].astype(bool)
 E, R = len(U), 6371000.0
@@ -70,13 +100,13 @@ idx = np.arange(top, dtype=np.int64) - np.repeat(np.cumsum(np.r_[0, L])[:-1], L)
 d = d_g[idx]
 dz = np.where(ters[eid], -dz_g[idx], dz_g[idx])
 dz = np.clip(dz, -EGS * d, EGS * d)
-v = np.repeat((km / np.maximum(dk, 1e-9)) * 1000.0 / 60.0, L)
+v = np.repeat((km / np.maximum(dk, 1e-9)) * 1000.0 / 60.0, L) * HIZK
 # Fiori: yuvarlanma direnci HIZA BAGLI -> F = m g (Cr/1000)(c1*v_kmh + c2). Sabit C_rr degil.
 yuv = (Cr / 1000.0) * (c1 * (v * 3.6) + c2)
 fr_s = m * gg * yuv * d + 0.5 * rho * Cd * A * v * v * d          # parca surtunme + hava direnci (J)
 fric = np.bincount(eid, weights=fr_s, minlength=E)
 del yuv
-# v3 (30.09.2026, revizyon:): Denk. (6) PARCA bazinda uygulanir. Parca mekanik enerjisi
+# v3 (30.09.2026, revizyon: Denk. (6) PARCA bazinda uygulanir. Parca mekanik enerjisi
 # Em = fr + m g dz; cekis ise Em/eta_dt, geri kazanim ise Em*eta_re*eta_dt.
 kre = m * gg * ere * edt                                          # potansiyel katsayisi (J/m)
 Em = fr_s + m * gg * dz
@@ -103,12 +133,12 @@ net = zn[V] - zn[U]
 C = np.maximum((Dpos_h + Dneg_h - np.abs(net)) / 2.0, 0.0)     # kenar ici dalgalanma fazlasi
 Dpos, Dneg = np.maximum(net, 0.0) + C, np.maximum(-net, 0.0) + C
 if V2:
-    kwh = (fric / edt + m * gg * Dpos / edt - m * gg * Dneg * ere * edt) / J2K + PauxkW * (dk / 60.0)
+    kwh = (fric / edt + m * gg * Dpos / edt - m * gg * Dneg * ere * edt) / J2K + PauxkW * (dk / HIZK / 60.0)
 else:
     # parca toplamı + dugum yukseltisiyle uzlastirma: kenarin net yukselti farki DUGUM rakimindan alinir,
     # boylece potansiyel donusumu tutarli kalir: w = sum(c_s - kre dz_s) + P_aux t >= 0
-    kwh = (sum_c + kre * (net - sum_dz)) / J2K + PauxkW * (dk / 60.0)
-    # revizyon (02.10.2026): uzlastirma teriminin buyuklugu nicel olarak raporlanir
+    kwh = (sum_c + kre * (net - sum_dz)) / J2K + PauxkW * (dk / HIZK / 60.0)
+    # revizyon: uzlastirma teriminin buyuklugu nicel olarak raporlanir
     duz = kre * (net - sum_dz) / J2K
     fark_m = np.abs(net - sum_dz)
     print("Uzlastirma terimi: |net - sum dz| medyan %.2f m, 95. yuzdelik %.2f m | |terim| ort %.5f kWh "
