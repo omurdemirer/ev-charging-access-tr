@@ -15,7 +15,7 @@ the population-weighted Gini coefficient is split across the three definitions w
 decomposition. A bi-objective mixed-integer model, built on the distance catchment, links the
 results to investment.
 
-Archived version: [doi:10.5281/zenodo.23037338](https://doi.org/10.5281/zenodo.23037338) ·
+Archived version: [doi:10.5281/zenodo.24278501](https://doi.org/10.5281/zenodo.24278501) (all versions: [doi:10.5281/zenodo.23037337](https://doi.org/10.5281/zenodo.23037337)) ·
 this release: **v1.2.0** (16 Nov 2026; adds the robustness analyses of the revised manuscript, Appendix Tables A.4–A.10 and the extended Table 8; v1.1.1 of 5 Oct 2026 is the first-submission version)
 
 Author: Ömür DEMİRER, Hitit University — ORCID [0000-0002-9502-9935](https://orcid.org/0000-0002-9502-9935)
